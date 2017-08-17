@@ -14,7 +14,7 @@
 
 ########  initialization #######################
 
-# always set these values, when using the provider the first time
+# set these values, when using the provider the first time
 #export SLTEC_user="0000000"
 #export SLTEC_password="********************"
 
@@ -22,7 +22,7 @@
 #export SLTEC_context="10"
 #export SLTEC_server="https://gateway.schlundtech.de/"
 
-# default values for schlundtech dns requests, if not give above
+# default values for schlundtech dns requests, if the above not given
 SLTEC_context_default="10"
 SLTEC_server_default="https://gateway.schlundtech.de/"
 
