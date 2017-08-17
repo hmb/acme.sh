@@ -44,7 +44,7 @@ dns_schlundtech_add() {
 
   _SLTEC_split_domain "$fulldomain"
 
-  _info "using the schlundtech dns api"
+  _info "Using the schlundtech dns api to set the ${fulldomain} record"
   _debug "fulldomain: ${fulldomain}"
   _debug "domain    : ${_SLTEC_domain}" 
   _debug "subdomain : ${_SLTEC_subdomain}" 
@@ -78,7 +78,7 @@ dns_schlundtech_rm() {
 
   _SLTEC_split_domain "$fulldomain"
 
-  _info "using schlundtech dns api"
+  _info "Using the schlundtech dns api to remove the ${fulldomain} record"
   _debug "fulldomain: ${fulldomain}"
   _debug "txtvalue  : ${txtvalue}"
   _debug "domain    : ${_SLTEC_domain}" 
