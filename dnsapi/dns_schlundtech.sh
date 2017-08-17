@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env sh
 
 ########
 # This is a custom DNS adapter for the german Schlundtech domain provider.
