@@ -54,7 +54,7 @@ dns_schlundtech_add() {
   _debug "xmladd: ${_SLTEC_xmladd}" 
 
   _SLTEC_send_request "$_SLTEC_xmladd" "$SLTEC_server"
-  echo "$_SLTEC_response" | grep "<code>S0202</code>"
+  echo "$_SLTEC_response" | grep "<code>S0202</code>" > /dev/null
   local result="$?"
   _debug "result: ${result}"
 
@@ -88,7 +88,7 @@ dns_schlundtech_rm() {
   _debug "xmlrm:  ${_SLTEC_xmlrm}" 
 
   _SLTEC_send_request "$_SLTEC_xmlrm" "$SLTEC_server"
-  echo "$_SLTEC_response" | grep "<code>S0202</code>"
+  echo "$_SLTEC_response" | grep "<code>S0202</code>" > /dev/null
   local result="$?"
   _debug "result: ${result}"
     
