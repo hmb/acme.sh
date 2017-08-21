@@ -26,7 +26,6 @@
 SLTEC_context_default="10"
 SLTEC_server_default="https://gateway.schlundtech.de/"
 
-
 ########  public functions #####################
 
 # Add the txt record before validation.
@@ -61,7 +60,6 @@ dns_schlundtech_add() {
   # returns 0 means success, otherwise error.
   return "$_ST_add_result"
 }
-
 
 # Remove the txt record after validation.
 # Usage: dns_schlundtech_rm _acme-challenge.www.domain.com "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
