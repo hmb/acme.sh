@@ -46,15 +46,15 @@ dns_schlundtech_add() {
 
   _info "Using the schlundtech dns api to set the ${fulldomain} record"
   _debug "fulldomain: ${fulldomain}"
-  _debug "domain    : ${_SLTEC_domain}" 
-  _debug "subdomain : ${_SLTEC_subdomain}" 
+  _debug "domain    : ${_SLTEC_domain}"
+  _debug "subdomain : ${_SLTEC_subdomain}"
   _debug "txtvalue  : ${txtvalue}"
 
   _SLTEC_init_request_add "$SLTEC_user" "$SLTEC_password" "$SLTEC_context" "$_SLTEC_domain" "$_SLTEC_subdomain" "$txtvalue"
-  _debug "xmladd: ${_SLTEC_xmladd}" 
+  _debug "xmladd: ${_SLTEC_xmladd}"
 
   _SLTEC_send_request "$_SLTEC_xmladd" "$SLTEC_server"
-  echo "$_SLTEC_response" | grep "<code>S0202</code>" > /dev/null
+  echo "$_SLTEC_response" | grep "<code>S0202</code>" >/dev/null
   _ST_add_result="$?"
   _debug "result: ${_ST_add_result}"
 
@@ -81,21 +81,20 @@ dns_schlundtech_rm() {
   _info "Using the schlundtech dns api to remove the ${fulldomain} record"
   _debug "fulldomain: ${fulldomain}"
   _debug "txtvalue  : ${txtvalue}"
-  _debug "domain    : ${_SLTEC_domain}" 
-  _debug "subdomain : ${_SLTEC_subdomain}" 
+  _debug "domain    : ${_SLTEC_domain}"
+  _debug "subdomain : ${_SLTEC_subdomain}"
 
   _SLTEC_init_request_rm "$SLTEC_user" "$SLTEC_password" "$SLTEC_context" "$_SLTEC_domain" "$_SLTEC_subdomain" "$txtvalue"
-  _debug "xmlrm:  ${_SLTEC_xmlrm}" 
+  _debug "xmlrm:  ${_SLTEC_xmlrm}"
 
   _SLTEC_send_request "$_SLTEC_xmlrm" "$SLTEC_server"
-  echo "$_SLTEC_response" | grep "<code>S0202</code>" > /dev/null
+  echo "$_SLTEC_response" | grep "<code>S0202</code>" >/dev/null
   _ST_rm_result="$?"
   _debug "result: ${_ST_rm_result}"
-    
+
   # no return value documented
   #return "$_ST_rm_result"
 }
-
 
 ####################  private functions below ##################################
 
@@ -124,14 +123,12 @@ _SLTEC_credentials() {
   fi
 }
 
-
 _SLTEC_split_domain() {
   _ST_split_fulldomain="$1"
-  
-  _SLTEC_domain="$(echo "$_ST_split_fulldomain" | sed 's/.*\.\([^.]*\.[^.]*\)/\1/')" 
+
+  _SLTEC_domain="$(echo "$_ST_split_fulldomain" | sed 's/.*\.\([^.]*\.[^.]*\)/\1/')"
   _SLTEC_subdomain="$(echo "$_ST_split_fulldomain" | sed 's/\(.*\)\.[^.]*\.[^.]*/\1/')"
 }
-
 
 _SLTEC_init_request_add() {
   _ST_init_add_user="$1"
@@ -165,7 +162,6 @@ _SLTEC_init_request_add() {
   </request>"
 }
 
-
 _SLTEC_init_request_rm() {
   _ST_init_rm_user="$1"
   _ST_init_rm_password="$2"
@@ -196,7 +192,6 @@ _SLTEC_init_request_rm() {
     </task>
   </request>"
 }
-
 
 _SLTEC_send_request() {
   _ST_send_request="$1"
