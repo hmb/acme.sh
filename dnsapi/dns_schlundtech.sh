@@ -33,8 +33,8 @@ SLTEC_server_default="https://gateway.schlundtech.de/"
 # Usage: dns_schlundtech_add _acme-challenge.www.domain.com "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
 
 dns_schlundtech_add() {
-  local fulldomain="$1"
-  local txtvalue="$2"
+  fulldomain="$1"
+  txtvalue="$2"
 
   _SLTEC_credentials
   if [ "$?" -ne 0 ]; then
@@ -55,11 +55,11 @@ dns_schlundtech_add() {
 
   _SLTEC_send_request "$_SLTEC_xmladd" "$SLTEC_server"
   echo "$_SLTEC_response" | grep "<code>S0202</code>" > /dev/null
-  local result="$?"
-  _debug "result: ${result}"
+  _ST_add_result="$?"
+  _debug "result: ${_ST_add_result}"
 
   # returns 0 means success, otherwise error.
-  return "$result"
+  return "$_ST_add_result"
 }
 
 
@@ -67,8 +67,8 @@ dns_schlundtech_add() {
 # Usage: dns_schlundtech_rm _acme-challenge.www.domain.com "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
 
 dns_schlundtech_rm() {
-  local fulldomain="$1"
-  local txtvalue="$2"
+  fulldomain="$1"
+  txtvalue="$2"
 
   _SLTEC_credentials
   if [ "$?" -ne 0 ]; then
@@ -89,11 +89,11 @@ dns_schlundtech_rm() {
 
   _SLTEC_send_request "$_SLTEC_xmlrm" "$SLTEC_server"
   echo "$_SLTEC_response" | grep "<code>S0202</code>" > /dev/null
-  local result="$?"
-  _debug "result: ${result}"
+  _ST_rm_result="$?"
+  _debug "result: ${_ST_rm_result}"
     
   # no return value documented
-  #return "$result"
+  #return "$_ST_rm_result"
 }
 
 
@@ -126,40 +126,40 @@ _SLTEC_credentials() {
 
 
 _SLTEC_split_domain() {
-  local fulldomain="$1"
+  _ST_split_fulldomain="$1"
   
-  _SLTEC_domain="$(echo "$fulldomain" | sed 's/.*\.\([^.]*\.[^.]*\)/\1/')" 
-  _SLTEC_subdomain="$(echo "$fulldomain" | sed 's/\(.*\)\.[^.]*\.[^.]*/\1/')"
+  _SLTEC_domain="$(echo "$_ST_split_fulldomain" | sed 's/.*\.\([^.]*\.[^.]*\)/\1/')" 
+  _SLTEC_subdomain="$(echo "$_ST_split_fulldomain" | sed 's/\(.*\)\.[^.]*\.[^.]*/\1/')"
 }
 
 
 _SLTEC_init_request_add() {
-  local user="$1"
-  local password="$2"
-  local context="$3"
-  local domain="$4"
-  local subdomain="$5"
-  local value="$6"
+  _ST_init_add_user="$1"
+  _ST_init_add_password="$2"
+  _ST_init_add_context="$3"
+  _ST_init_add_domain="$4"
+  _ST_init_add_subdomain="$5"
+  _ST_init_add_value="$6"
 
   _SLTEC_xmladd="<?xml version='1.0' encoding='utf-8'?>
   <request>
     <auth>
-      <user>${user}</user>
-      <password>${password}</password>
-      <context>${context}</context>
+      <user>${_ST_init_add_user}</user>
+      <password>${_ST_init_add_password}</password>
+      <context>${_ST_init_add_context}</context>
     </auth>
     <task>
       <code>0202001</code>
       <default>
         <rr_add>
-          <name>${subdomain}</name>
+          <name>${_ST_init_add_subdomain}</name>
           <type>TXT</type>
-          <value>${value}</value>
+          <value>${_ST_init_add_value}</value>
           <ttl>60</ttl>
         </rr_add>
       </default>
       <zone>
-        <name>${domain}</name>
+        <name>${_ST_init_add_domain}</name>
       </zone>
     </task>
   </request>"
@@ -167,31 +167,31 @@ _SLTEC_init_request_add() {
 
 
 _SLTEC_init_request_rm() {
-  local user="$1"
-  local password="$2"
-  local context="$3"
-  local domain="$4"
-  local subdomain="$5"
-  local value="$6"
+  _ST_init_rm_user="$1"
+  _ST_init_rm_password="$2"
+  _ST_init_rm_context="$3"
+  _ST_init_rm_domain="$4"
+  _ST_init_rm_subdomain="$5"
+  _ST_init_rm_value="$6"
 
   _SLTEC_xmlrm="<?xml version='1.0' encoding='utf-8'?>
   <request>
     <auth>
-      <user>${user}</user>
-      <password>${password}</password>
-      <context>${context}</context>
+      <user>${_ST_init_rm_user}</user>
+      <password>${_ST_init_rm_password}</password>
+      <context>${_ST_init_rm_context}</context>
     </auth>
     <task>
       <code>0202001</code>
       <default>
         <rr_rem>
-          <name>${subdomain}</name>
+          <name>${_ST_init_rm_subdomain}</name>
           <type>TXT</type>
-          <value>${value}</value>
+          <value>${_ST_init_rm_value}</value>
         </rr_rem>
       </default>
       <zone>
-        <name>${domain}</name>
+        <name>${_ST_init_rm_domain}</name>
       </zone>
     </task>
   </request>"
@@ -199,9 +199,9 @@ _SLTEC_init_request_rm() {
 
 
 _SLTEC_send_request() {
-  local request="$1"
-  local url="$2"
+  _ST_send_request="$1"
+  _ST_send_url="$2"
 
-  _SLTEC_response="$(curl -s -H "Content-type: text/xml" --data-binary "${request}" "${url}")"
+  _SLTEC_response="$(curl -s -H "Content-type: text/xml" --data-binary "${_ST_send_request}" "${_ST_send_url}")"
   _debug "response: ${_SLTEC_response}"
 }
