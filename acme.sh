@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-VER=2.7.3
+VER=2.7.6
 
 PROJECT_NAME="acme.sh"
 
@@ -15,7 +15,6 @@ _SUB_FOLDERS="dnsapi deploy"
 
 _OLD_CA_HOST="https://acme-v01.api.letsencrypt.org"
 DEFAULT_CA="https://acme-v01.api.letsencrypt.org/directory"
-DEFAULT_AGREEMENT="https://letsencrypt.org/documents/LE-SA-v1.1.1-August-1-2016.pdf"
 
 DEFAULT_USER_AGENT="$PROJECT_NAME/$VER ($PROJECT)"
 DEFAULT_ACCOUNT_EMAIL=""
@@ -100,6 +99,10 @@ _PREPARE_LINK="https://github.com/Neilpang/acme.sh/wiki/Install-preparations"
 
 _STATELESS_WIKI="https://github.com/Neilpang/acme.sh/wiki/Stateless-Mode"
 
+_DNS_MANUAL_ERR="The dns manual mode can not renew automatically, you must issue it again manually. You'd better use the other modes instead."
+
+_DNS_MANUAL_WARN="It seems that you are using dns manual mode. please take care: $_DNS_MANUAL_ERR"
+
 __INTERACTIVE=""
 if [ -t 1 ]; then
   __INTERACTIVE="1"
@@ -160,11 +163,11 @@ _dlg_versions() {
     echo "nginx doesn't exists."
   fi
 
-  echo "nc:"
-  if _exists "nc"; then
-    nc -h 2>&1
+  echo "socat:"
+  if _exists "socat"; then
+    socat -h 2>&1
   else
-    _debug "nc doesn't exists."
+    _debug "socat doesn't exists."
   fi
 }
 
@@ -459,8 +462,7 @@ if _exists xargs && [ "$(printf %s '\\x41' | xargs printf)" = 'A' ]; then
 fi
 
 _h2b() {
-  if _exists xxd; then
-    xxd -r -p
+  if _exists xxd && xxd -r -p 2>/dev/null; then
     return
   fi
 
@@ -897,17 +899,11 @@ _sign() {
   fi
 
   _sign_openssl="${ACME_OPENSSL_BIN:-openssl} dgst -sign $keyfile "
-  if [ "$alg" = "sha256" ]; then
-    _sign_openssl="$_sign_openssl -$alg"
-  else
-    _err "$alg is not supported yet"
-    return 1
-  fi
 
   if grep "BEGIN RSA PRIVATE KEY" "$keyfile" >/dev/null 2>&1; then
-    $_sign_openssl | _base64
+    $_sign_openssl -$alg | _base64
   elif grep "BEGIN EC PRIVATE KEY" "$keyfile" >/dev/null 2>&1; then
-    if ! _signedECText="$($_sign_openssl | ${ACME_OPENSSL_BIN:-openssl} asn1parse -inform DER)"; then
+    if ! _signedECText="$($_sign_openssl -sha$__ECC_KEY_LEN | ${ACME_OPENSSL_BIN:-openssl} asn1parse -inform DER)"; then
       _err "Sign failed: $_sign_openssl"
       _err "Key file: $keyfile"
       _err "Key content:$(wc -l <"$keyfile") lines"
@@ -1430,7 +1426,11 @@ _calcjwk() {
     _debug "EC key"
     crv="$(${ACME_OPENSSL_BIN:-openssl} ec -in "$keyfile" -noout -text 2>/dev/null | grep "^NIST CURVE:" | cut -d ":" -f 2 | tr -d " \r\n")"
     _debug3 crv "$crv"
-
+    __ECC_KEY_LEN=$(echo "$crv" | cut -d "-" -f 2)
+    if [ "$__ECC_KEY_LEN" = "521" ]; then
+      __ECC_KEY_LEN=512
+    fi
+    _debug3 __ECC_KEY_LEN "$__ECC_KEY_LEN"
     if [ -z "$crv" ]; then
       _debug "Let's try ASN1 OID"
       crv_oid="$(${ACME_OPENSSL_BIN:-openssl} ec -in "$keyfile" -noout -text 2>/dev/null | grep "^ASN1 OID:" | cut -d ":" -f 2 | tr -d " \r\n")"
@@ -1438,12 +1438,15 @@ _calcjwk() {
       case "${crv_oid}" in
         "prime256v1")
           crv="P-256"
+          __ECC_KEY_LEN=256
           ;;
         "secp384r1")
           crv="P-384"
+          __ECC_KEY_LEN=384
           ;;
         "secp521r1")
           crv="P-521"
+          __ECC_KEY_LEN=512
           ;;
         *)
           _err "ECC oid : $crv_oid"
@@ -1485,9 +1488,9 @@ _calcjwk() {
     jwk='{"crv": "'$crv'", "kty": "EC", "x": "'$x64'", "y": "'$y64'"}'
     _debug3 jwk "$jwk"
 
-    JWK_HEADER='{"alg": "ES256", "jwk": '$jwk'}'
+    JWK_HEADER='{"alg": "ES'$__ECC_KEY_LEN'", "jwk": '$jwk'}'
     JWK_HEADERPLACE_PART1='{"nonce": "'
-    JWK_HEADERPLACE_PART2='", "alg": "ES256", "jwk": '$jwk'}'
+    JWK_HEADERPLACE_PART2='", "alg": "ES'$__ECC_KEY_LEN'", "jwk": '$jwk'}'
   else
     _err "Only RSA or EC key is supported."
     return 1
@@ -1810,7 +1813,13 @@ _send_signed_request() {
 
     _CACHED_NONCE="$(echo "$responseHeaders" | grep "Replay-Nonce:" | _head_n 1 | tr -d "\r\n " | cut -d ':' -f 2)"
 
-    if _contains "$response" "JWS has invalid anti-replay nonce"; then
+    _body="$response"
+    if [ "$needbase64" ]; then
+      _body="$(echo "$_body" | _dbase64)"
+      _debug2 _body "$_body"
+    fi
+
+    if _contains "$_body" "JWS has invalid anti-replay nonce"; then
       _info "It seems the CA server is busy now, let's wait and retry."
       _request_retry_times=$(_math "$_request_retry_times" + 1)
       _sleep 5
@@ -1963,68 +1972,22 @@ _startserver() {
   _debug "ncaddr" "$ncaddr"
 
   _debug "startserver: $$"
-  nchelp="$(nc -h 2>&1)"
 
   _debug Le_HTTPPort "$Le_HTTPPort"
   _debug Le_Listen_V4 "$Le_Listen_V4"
   _debug Le_Listen_V6 "$Le_Listen_V6"
-  _NC="nc"
 
+  _NC="socat"
   if [ "$Le_Listen_V4" ]; then
     _NC="$_NC -4"
   elif [ "$Le_Listen_V6" ]; then
     _NC="$_NC -6"
   fi
 
-  if [ "$Le_Listen_V4$Le_Listen_V6$ncaddr" ]; then
-    if ! _contains "$nchelp" "-4"; then
-      _err "The nc doesn't support '-4', '-6' or local-address, please install 'netcat-openbsd' and try again."
-      _err "See $(__green $_PREPARE_LINK)"
-      return 1
-    fi
-  fi
-
-  if echo "$nchelp" | grep "\-q[ ,]" >/dev/null; then
-    _NC="$_NC -q 1 -l $ncaddr"
-  else
-    if echo "$nchelp" | grep "GNU netcat" >/dev/null && echo "$nchelp" | grep "\-c, \-\-close" >/dev/null; then
-      _NC="$_NC -c -l $ncaddr"
-    elif echo "$nchelp" | grep "\-N" | grep "Shutdown the network socket after EOF on stdin" >/dev/null; then
-      _NC="$_NC -N -l $ncaddr"
-    else
-      _NC="$_NC -l $ncaddr"
-    fi
-  fi
-
   _debug "_NC" "$_NC"
-
-  #for centos ncat
-  if _contains "$nchelp" "nmap.org"; then
-    _debug "Using ncat: nmap.org"
-    if ! _exec "printf \"%s\r\n\r\n%s\" \"HTTP/1.1 200 OK\" \"$content\" | $_NC \"$Le_HTTPPort\" >&2"; then
-      _exec_err
-      return 1
-    fi
-    if [ "$DEBUG" ]; then
-      _exec_err
-    fi
-    return
-  fi
-
-  #  while true ; do
-  if ! _exec "printf \"%s\r\n\r\n%s\" \"HTTP/1.1 200 OK\" \"$content\" | $_NC -p \"$Le_HTTPPort\" >&2"; then
-    _exec "printf \"%s\r\n\r\n%s\" \"HTTP/1.1 200 OK\" \"$content\" | $_NC \"$Le_HTTPPort\" >&2"
-  fi
-
-  if [ "$?" != "0" ]; then
-    _err "nc listen error."
-    _exec_err
-    exit 1
-  fi
-  if [ "$DEBUG" ]; then
-    _exec_err
-  fi
-  #  done
+  #todo  listen address
+  $_NC TCP-LISTEN:$Le_HTTPPort,crlf,reuseaddr,fork SYSTEM:"sleep 0.5; echo HTTP/1.1 200 OK; echo ; echo  $content; echo;" &
+  serverproc="$!"
 }
 
 _stopserver() {
@@ -2034,25 +1997,8 @@ _stopserver() {
     return
   fi
 
-  _debug2 "Le_HTTPPort" "$Le_HTTPPort"
-  if [ "$Le_HTTPPort" ]; then
-    if [ "$DEBUG" ] && [ "$DEBUG" -gt "3" ]; then
-      _get "http://localhost:$Le_HTTPPort" "" 1
-    else
-      _get "http://localhost:$Le_HTTPPort" "" 1 >/dev/null 2>&1
-    fi
-  fi
+  kill $pid
 
-  _debug2 "Le_TLSPort" "$Le_TLSPort"
-  if [ "$Le_TLSPort" ]; then
-    if [ "$DEBUG" ] && [ "$DEBUG" -gt "3" ]; then
-      _get "https://localhost:$Le_TLSPort" "" 1
-      _get "https://localhost:$Le_TLSPort" "" 1
-    else
-      _get "https://localhost:$Le_TLSPort" "" 1 >/dev/null 2>&1
-      _get "https://localhost:$Le_TLSPort" "" 1 >/dev/null 2>&1
-    fi
-  fi
 }
 
 # sleep sec
@@ -2107,7 +2053,7 @@ _starttlsserver() {
     return 1
   fi
 
-  __S_OPENSSL="${ACME_OPENSSL_BIN:-openssl} s_server -cert $TLS_CERT  -key $TLS_KEY "
+  __S_OPENSSL="${ACME_OPENSSL_BIN:-openssl} s_server -www -cert $TLS_CERT  -key $TLS_KEY "
   if [ "$opaddr" ]; then
     __S_OPENSSL="$__S_OPENSSL -accept $opaddr:$port"
   else
@@ -2124,9 +2070,9 @@ _starttlsserver() {
 
   _debug "$__S_OPENSSL"
   if [ "$DEBUG" ] && [ "$DEBUG" -ge "2" ]; then
-    (printf "%s\r\n\r\n%s" "HTTP/1.1 200 OK" "$content" | $__S_OPENSSL -tlsextdebug) &
+    $__S_OPENSSL -tlsextdebug &
   else
-    (printf "%s\r\n\r\n%s" "HTTP/1.1 200 OK" "$content" | $__S_OPENSSL >/dev/null 2>&1) &
+    $__S_OPENSSL >/dev/null 2>&1 &
   fi
 
   serverproc="$!"
@@ -2214,17 +2160,6 @@ _initAPI() {
   _api_server="${1:-$ACME_DIRECTORY}"
   _debug "_init api for server: $_api_server"
 
-  if [ "$_api_server" = "$DEFAULT_CA" ]; then
-    #just for performance, hardcode the default entry points
-    export ACME_KEY_CHANGE="https://acme-v01.api.letsencrypt.org/acme/key-change"
-    export ACME_NEW_AUTHZ="https://acme-v01.api.letsencrypt.org/acme/new-authz"
-    export ACME_NEW_ORDER="https://acme-v01.api.letsencrypt.org/acme/new-cert"
-    export ACME_NEW_ORDER_RES="new-cert"
-    export ACME_NEW_ACCOUNT="https://acme-v01.api.letsencrypt.org/acme/new-reg"
-    export ACME_NEW_ACCOUNT_RES="new-reg"
-    export ACME_REVOKE_CERT="https://acme-v01.api.letsencrypt.org/acme/revoke-cert"
-  fi
-
   if [ -z "$ACME_NEW_ACCOUNT" ]; then
     response=$(_get "$_api_server")
     if [ "$?" != "0" ]; then
@@ -2264,13 +2199,17 @@ _initAPI() {
     ACME_NEW_NONCE=$(echo "$response" | _egrep_o 'new-nonce" *: *"[^"]*"' | cut -d '"' -f 3)
     export ACME_NEW_NONCE
 
-  fi
+    ACME_AGREEMENT=$(echo "$response" | _egrep_o 'terms-of-service" *: *"[^"]*"' | cut -d '"' -f 3)
+    export ACME_AGREEMENT
 
-  _debug "ACME_KEY_CHANGE" "$ACME_KEY_CHANGE"
-  _debug "ACME_NEW_AUTHZ" "$ACME_NEW_AUTHZ"
-  _debug "ACME_NEW_ORDER" "$ACME_NEW_ORDER"
-  _debug "ACME_NEW_ACCOUNT" "$ACME_NEW_ACCOUNT"
-  _debug "ACME_REVOKE_CERT" "$ACME_REVOKE_CERT"
+    _debug "ACME_KEY_CHANGE" "$ACME_KEY_CHANGE"
+    _debug "ACME_NEW_AUTHZ" "$ACME_NEW_AUTHZ"
+    _debug "ACME_NEW_ORDER" "$ACME_NEW_ORDER"
+    _debug "ACME_NEW_ACCOUNT" "$ACME_NEW_ACCOUNT"
+    _debug "ACME_REVOKE_CERT" "$ACME_REVOKE_CERT"
+    _debug "ACME_AGREEMENT" "$ACME_AGREEMENT"
+
+  fi
 }
 
 #[domain]  [keylength or isEcc flag]
@@ -2302,6 +2241,7 @@ _initpath() {
     fi
   fi
 
+  _debug2 ACME_DIRECTORY "$ACME_DIRECTORY"
   _ACME_SERVER_HOST="$(echo "$ACME_DIRECTORY" | cut -d : -f 2 | tr -s / | cut -d / -f 2)"
   _debug2 "_ACME_SERVER_HOST" "$_ACME_SERVER_HOST"
 
@@ -2939,8 +2879,8 @@ _on_before_issue() {
   fi
 
   if _hasfield "$_chk_web_roots" "$NO_VALUE"; then
-    if ! _exists "nc"; then
-      _err "Please install netcat(nc) tools first."
+    if ! _exists "socat"; then
+      _err "Please install socat tools first."
       return 1
     fi
   fi
@@ -3046,6 +2986,10 @@ _on_issue_err() {
     )
   fi
 
+  if [ "$IS_RENEW" = "1" ] && _hasfield "$Le_Webroot" "dns"; then
+    _err "$_DNS_MANUAL_ERR"
+  fi
+
   if [ "$DEBUG" ] && [ "$DEBUG" -gt "0" ]; then
     _debug "$(_dlg_versions)"
   fi
@@ -3078,6 +3022,10 @@ _on_issue_success() {
     fi
   fi
 
+  if _hasfield "$Le_Webroot" "dns"; then
+    _err "$_DNS_MANUAL_WARN"
+  fi
+
 }
 
 updateaccount() {
@@ -3103,7 +3051,7 @@ __calc_account_thumbprint() {
 _regAccount() {
   _initpath
   _reg_length="$1"
-
+  _debug3 _regAccount "$_regAccount"
   mkdir -p "$CA_DIR"
   if [ ! -f "$ACCOUNT_KEY_PATH" ] && [ -f "$_OLD_ACCOUNT_KEY" ]; then
     _info "mv $_OLD_ACCOUNT_KEY to $ACCOUNT_KEY_PATH"
@@ -3126,75 +3074,45 @@ _regAccount() {
     return 1
   fi
   _initAPI
-  _updateTos=""
   _reg_res="$ACME_NEW_ACCOUNT_RES"
-  while true; do
-    _debug AGREEMENT "$AGREEMENT"
+  regjson='{"resource": "'$_reg_res'", "terms-of-service-agreed": true, "agreement": "'$ACME_AGREEMENT'"}'
+  if [ "$ACCOUNT_EMAIL" ]; then
+    regjson='{"resource": "'$_reg_res'", "contact": ["mailto: '$ACCOUNT_EMAIL'"], "terms-of-service-agreed": true, "agreement": "'$ACME_AGREEMENT'"}'
+  fi
 
-    regjson='{"resource": "'$_reg_res'", "agreement": "'$AGREEMENT'"}'
+  _info "Registering account"
 
-    if [ "$ACCOUNT_EMAIL" ]; then
-      regjson='{"resource": "'$_reg_res'", "contact": ["mailto: '$ACCOUNT_EMAIL'"], "agreement": "'$AGREEMENT'"}'
-    fi
+  if ! _send_signed_request "${ACME_NEW_ACCOUNT}" "$regjson"; then
+    _err "Register account Error: $response"
+    return 1
+  fi
 
-    if [ -z "$_updateTos" ]; then
-      _info "Registering account"
+  if [ "$code" = "" ] || [ "$code" = '201' ]; then
+    echo "$response" >"$ACCOUNT_JSON_PATH"
+    _info "Registered"
+  elif [ "$code" = '409' ]; then
+    _info "Already registered"
+  else
+    _err "Register account Error: $response"
+    return 1
+  fi
 
-      if ! _send_signed_request "${ACME_NEW_ACCOUNT}" "$regjson"; then
-        _err "Register account Error: $response"
-        return 1
-      fi
+  _accUri="$(echo "$responseHeaders" | grep "^Location:" | _head_n 1 | cut -d ' ' -f 2 | tr -d "\r\n")"
+  _debug "_accUri" "$_accUri"
+  _savecaconf "ACCOUNT_URL" "$_accUri"
 
-      if [ "$code" = "" ] || [ "$code" = '201' ]; then
-        echo "$response" >"$ACCOUNT_JSON_PATH"
-        _info "Registered"
-      elif [ "$code" = '409' ]; then
-        _info "Already registered"
-      else
-        _err "Register account Error: $response"
-        return 1
-      fi
+  echo "$response" >"$ACCOUNT_JSON_PATH"
+  CA_KEY_HASH="$(__calcAccountKeyHash)"
+  _debug "Calc CA_KEY_HASH" "$CA_KEY_HASH"
+  _savecaconf CA_KEY_HASH "$CA_KEY_HASH"
 
-      _accUri="$(echo "$responseHeaders" | grep "^Location:" | _head_n 1 | cut -d ' ' -f 2 | tr -d "\r\n")"
-      _debug "_accUri" "$_accUri"
-      _savecaconf "ACCOUNT_URL" "$_accUri"
-      _tos="$(echo "$responseHeaders" | grep "^Link:.*rel=\"terms-of-service\"" | _head_n 1 | _egrep_o "<.*>" | tr -d '<>')"
-      _debug "_tos" "$_tos"
-      if [ -z "$_tos" ]; then
-        _debug "Use default tos: $DEFAULT_AGREEMENT"
-        _tos="$DEFAULT_AGREEMENT"
-      fi
-      if [ "$_tos" != "$AGREEMENT" ]; then
-        _updateTos=1
-        AGREEMENT="$_tos"
-        _reg_res="reg"
-        continue
-      fi
+  if [ "$code" = '403' ]; then
+    _err "It seems that the account key is already deactivated, please use a new account key."
+    return 1
+  fi
 
-    else
-      _debug "Update tos: $_tos"
-      if ! _send_signed_request "$_accUri" "$regjson"; then
-        _err "Update tos error."
-        return 1
-      fi
-      if [ "$code" = '202' ]; then
-        _info "Update account tos info success."
-
-        CA_KEY_HASH="$(__calcAccountKeyHash)"
-        _debug "Calc CA_KEY_HASH" "$CA_KEY_HASH"
-        _savecaconf CA_KEY_HASH "$CA_KEY_HASH"
-      elif [ "$code" = '403' ]; then
-        _err "It seems that the account key is already deactivated, please use a new account key."
-        return 1
-      else
-        _err "Update account error."
-        return 1
-      fi
-    fi
-    ACCOUNT_THUMBPRINT="$(__calc_account_thumbprint)"
-    _info "ACCOUNT_THUMBPRINT" "$ACCOUNT_THUMBPRINT"
-    return 0
-  done
+  ACCOUNT_THUMBPRINT="$(__calc_account_thumbprint)"
+  _info "ACCOUNT_THUMBPRINT" "$ACCOUNT_THUMBPRINT"
 
 }
 
@@ -3518,7 +3436,7 @@ issue() {
       token="$(printf "%s\n" "$entry" | _egrep_o '"token":"[^"]*' | cut -d : -f 2 | tr -d '"')"
       _debug token "$token"
 
-      uri="$(printf "%s\n" "$entry" | _egrep_o '"uri":"[^"]*' | cut -d : -f 2,3 | tr -d '"')"
+      uri="$(printf "%s\n" "$entry" | _egrep_o '"uri":"[^"]*' | cut -d '"' -f 4)"
       _debug uri "$uri"
 
       keyauthorization="$token.$thumbprint"
@@ -3653,13 +3571,12 @@ issue() {
         _info "Standalone mode server"
         _ncaddr="$(_getfield "$_local_addr" "$_ncIndex")"
         _ncIndex="$(_math $_ncIndex + 1)"
-        _startserver "$keyauthorization" "$_ncaddr" &
+        _startserver "$keyauthorization" "$_ncaddr"
         if [ "$?" != "0" ]; then
           _clearup
           _on_issue_err "$_post_hook" "$vlist"
           return 1
         fi
-        serverproc="$!"
         sleep 1
         _debug serverproc "$serverproc"
       elif [ "$_currentRoot" = "$MODE_STATELESS" ]; then
@@ -3994,7 +3911,10 @@ issue() {
   Le_NextRenewTime=$(_math "$Le_NextRenewTime" - 86400)
   _savedomainconf "Le_NextRenewTime" "$Le_NextRenewTime"
 
-  _on_issue_success "$_post_hook" "$_renew_hook"
+  if ! _on_issue_success "$_post_hook" "$_renew_hook"; then
+    _err "Call hook error."
+    return 1
+  fi
 
   if [ "$_real_cert$_real_key$_real_ca$_reload_cmd$_real_fullchain" ]; then
     _savedomainconf "Le_RealCertPath" "$_real_cert"
@@ -4388,7 +4308,12 @@ _installcert() {
     if [ -f "$_real_key" ] && [ ! "$IS_RENEW" ]; then
       cp "$_real_key" "$_backup_path/key.bak"
     fi
-    cat "$CERT_KEY_PATH" >"$_real_key"
+    if [ -f "$_real_key" ]; then
+      cat "$CERT_KEY_PATH" >"$_real_key"
+    else
+      cat "$CERT_KEY_PATH" >"$_real_key"
+      chmod 700 "$_real_key"
+    fi
   fi
 
   if [ "$_real_fullchain" ]; then
@@ -4776,9 +4701,9 @@ _precheck() {
     return 1
   fi
 
-  if ! _exists "nc"; then
-    _err "It is recommended to install nc first, try to install 'nc' or 'netcat'."
-    _err "We use nc for standalone server if you use standalone mode."
+  if ! _exists "socat"; then
+    _err "It is recommended to install socat first."
+    _err "We use socat for standalone server if you use standalone mode."
     _err "If you don't use standalone mode, just ignore this warning."
   fi
 
@@ -4878,9 +4803,11 @@ install() {
     _debug "Skip install cron job"
   fi
 
-  if ! _precheck "$_nocron"; then
-    _err "Pre-check failed, can not install."
-    return 1
+  if [ "$IN_CRON" != "1" ]; then
+    if ! _precheck "$_nocron"; then
+      _err "Pre-check failed, can not install."
+      return 1
+    fi
   fi
 
   if [ -z "$_c_home" ] && [ "$LE_CONFIG_HOME" != "$LE_WORKING_DIR" ]; then
@@ -4933,7 +4860,9 @@ install() {
 
   _info "Installed to $LE_WORKING_DIR/$PROJECT_ENTRY"
 
-  _installalias "$_c_home"
+  if [ "$IN_CRON" != "1" ]; then
+    _installalias "$_c_home"
+  fi
 
   for subf in $_SUB_FOLDERS; do
     if [ -d "$subf" ]; then
@@ -5023,7 +4952,7 @@ _uninstallalias() {
 }
 
 cron() {
-  IN_CRON=1
+  export IN_CRON=1
   _initpath
   _info "$(__green "===Starting cron===")"
   if [ "$AUTO_UPGRADE" = "1" ]; then
