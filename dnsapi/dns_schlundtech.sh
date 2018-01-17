@@ -272,6 +272,7 @@ _SLTEC_send_request() {
   _ST_send_request="$1"
   _ST_send_url="$2"
 
-  _SLTEC_response="$(curl -s -H "Content-type: text/xml" --data-binary "${_ST_send_request}" "${_ST_send_url}")"
+  _H1="Content-Type: text/xml"
+  _SLTEC_response="$(_post "${_ST_send_request}" "${_ST_send_url}")"
   _debug "response: ${_SLTEC_response}"
 }
