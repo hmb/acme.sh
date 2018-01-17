@@ -41,7 +41,10 @@ dns_schlundtech_add() {
     return 1
   fi
 
-  _SLTEC_split_domain "$fulldomain"
+  if ! _SLTEC_split_domain "$fulldomain"; then
+    _err "domain either invalid or not hosted by this account" 
+    return 1
+  fi
 
   _info "Using the schlundtech dns api to set the ${fulldomain} record"
   _debug "fulldomain: ${fulldomain}"
@@ -74,7 +77,10 @@ dns_schlundtech_rm() {
     return 1
   fi
 
-  _SLTEC_split_domain "$fulldomain"
+  if ! _SLTEC_split_domain "$fulldomain"; then
+    _err "domain either invalid or not hosted by this account" 
+    return 1
+  fi
 
   _info "Using the schlundtech dns api to remove the ${fulldomain} record"
   _debug "fulldomain: ${fulldomain}"
@@ -121,11 +127,82 @@ _SLTEC_credentials() {
   fi
 }
 
+# function _SLTEC_split_domain
+# split a fully qualified domain name into domain and subdomain
+# using the SchlundTech xml gateway interface
+# param 1: fqdn, e.g.: _acme-challenge.www.domain.com
+#returns
+# _SLTEC_subdomain=_acme-challenge.www
+# _SLTEC_domain=domain.com
+#
 _SLTEC_split_domain() {
   _ST_split_fulldomain="$1"
 
-  _SLTEC_domain="$(echo "$_ST_split_fulldomain" | sed 's/.*\.\([^.]*\.[^.]*\)/\1/')"
-  _SLTEC_subdomain="$(echo "$_ST_split_fulldomain" | sed 's/\(.*\)\.[^.]*\.[^.]*/\1/')"
+  _SLTEC_sd_i=2
+  _SLTEC_sd_p=1
+  _SLTEC_sd_max=100
+
+  while true; do
+    _SLTEC_domain="$(printf "%s" "$_ST_split_fulldomain" | cut -d . -f $_SLTEC_sd_i-$_SLTEC_sd_max)"
+    _debug "trying to inquire domain: $_SLTEC_domain"
+
+    if [ -z "$_SLTEC_domain" ]; then
+      # domain not valid
+      return 1
+    fi
+
+    # assemble inquire request and send it
+    _SLTEC_init_request_zoneinq "$SLTEC_user" "$SLTEC_password" "$SLTEC_context" "$_SLTEC_domain"
+    _debug "xmlzoneinc: ${_SLTEC_xmlzoneinq}"
+    _SLTEC_send_request "$_SLTEC_xmlzoneinq" "$SLTEC_server"
+    _debug "xmlzoneinc response: ${_SLTEC_response}"
+
+    if _contains "$_SLTEC_response" "<name>${_SLTEC_domain}</name>"; then
+      # found the correct domain/subdomain split
+      _SLTEC_subdomain=$(printf "%s" "$_ST_split_fulldomain" | cut -d . -f 1-$_SLTEC_sd_p)
+      _debug "_SLTEC_subdomain" "$_SLTEC_subdomain"
+      _debug "_SLTEC_domain" "$_SLTEC_domain"
+      return 0
+    fi
+
+    _SLTEC_sd_p=$_SLTEC_sd_i
+    _SLTEC_sd_i=$(_math "$_SLTEC_sd_i" + 1)
+  done
+
+  # code never reached
+  return 1
+}
+
+# function _SLTEC_init_request_zoneinq
+# fill a zone inquiry request with user, password context and domain
+# param 1: <SchlundTech user>
+# param 2: <SchlundTech password>
+# param 3: <SchlundTech context>
+# param 4: <domain>
+# returns: _SLTEC_xmlzoneinq the request to be sent to the server
+#
+_SLTEC_init_request_zoneinq() {
+  _ST_init_zi_user="$1"
+  _ST_init_zi_password="$2"
+  _ST_init_zi_context="$3"
+  _ST_init_zi_domain="$4"
+
+  _SLTEC_xmlzoneinq="<?xml version='1.0' encoding='utf-8'?>
+  <request>
+    <auth>
+      <user>${_ST_init_zi_user}</user>
+      <password>${_ST_init_zi_password}</password>
+      <context>${_ST_init_zi_context}</context>
+    </auth>
+    <task>
+      <code>0205</code>
+      <where>
+        <key>name</key>
+        <operator>eq</operator>
+        <value>${_ST_init_zi_domain}</value>
+      </where>
+    </task>
+  </request>"
 }
 
 _SLTEC_init_request_add() {
@@ -195,6 +272,7 @@ _SLTEC_send_request() {
   _ST_send_request="$1"
   _ST_send_url="$2"
 
-  _SLTEC_response="$(curl -s -H "Content-type: text/xml" --data-binary "${_ST_send_request}" "${_ST_send_url}")"
+  _H1="Content-Type: text/xml"
+  _SLTEC_response="$(_post "${_ST_send_request}" "${_ST_send_url}")"
   _debug "response: ${_SLTEC_response}"
 }
