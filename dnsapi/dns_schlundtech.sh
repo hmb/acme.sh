@@ -42,7 +42,7 @@ dns_schlundtech_add() {
   fi
 
   if ! _SLTEC_split_domain "$fulldomain"; then
-    _err "domain either invalid or not hosted by this account" 
+    _err "domain either invalid or not hosted by this account"
     return 1
   fi
 
@@ -78,7 +78,7 @@ dns_schlundtech_rm() {
   fi
 
   if ! _SLTEC_split_domain "$fulldomain"; then
-    _err "domain either invalid or not hosted by this account" 
+    _err "domain either invalid or not hosted by this account"
     return 1
   fi
 
