@@ -50,9 +50,10 @@ dns_schlundtech_add() {
   _debug "fulldomain: ${fulldomain}"
   _debug "domain    : ${_SLTEC_domain}"
   _debug "subdomain : ${_SLTEC_subdomain}"
+  _debug "system_ns : ${_SLTEC_systemns}"
   _debug "txtvalue  : ${txtvalue}"
 
-  _SLTEC_init_request_add "$SLTEC_user" "$SLTEC_password" "$SLTEC_context" "$_SLTEC_domain" "$_SLTEC_subdomain" "$txtvalue"
+  _SLTEC_init_request_add "$SLTEC_user" "$SLTEC_password" "$SLTEC_context" "$_SLTEC_domain" "$_SLTEC_subdomain" "$_SLTEC_systemns" "$txtvalue"
   _debug "xmladd: ${_SLTEC_xmladd}"
 
   _SLTEC_send_request "$_SLTEC_xmladd" "$SLTEC_server"
@@ -84,11 +85,12 @@ dns_schlundtech_rm() {
 
   _info "Using the schlundtech dns api to remove the ${fulldomain} record"
   _debug "fulldomain: ${fulldomain}"
-  _debug "txtvalue  : ${txtvalue}"
   _debug "domain    : ${_SLTEC_domain}"
   _debug "subdomain : ${_SLTEC_subdomain}"
+  _debug "system_ns : ${_SLTEC_systemns}"
+  _debug "txtvalue  : ${txtvalue}"
 
-  _SLTEC_init_request_rm "$SLTEC_user" "$SLTEC_password" "$SLTEC_context" "$_SLTEC_domain" "$_SLTEC_subdomain" "$txtvalue"
+  _SLTEC_init_request_rm "$SLTEC_user" "$SLTEC_password" "$SLTEC_context" "$_SLTEC_domain" "$_SLTEC_subdomain" "$_SLTEC_systemns" "$txtvalue"
   _debug "xmlrm:  ${_SLTEC_xmlrm}"
 
   _SLTEC_send_request "$_SLTEC_xmlrm" "$SLTEC_server"
@@ -134,6 +136,7 @@ _SLTEC_credentials() {
 #returns
 # _SLTEC_subdomain=_acme-challenge.www
 # _SLTEC_domain=domain.com
+# _SLTEC_systemns=nsa4.schlundtech.de
 #
 _SLTEC_split_domain() {
   _ST_split_fulldomain="$1"
@@ -160,8 +163,11 @@ _SLTEC_split_domain() {
     if _contains "$_SLTEC_response" "<name>${_SLTEC_domain}</name>"; then
       # found the correct domain/subdomain split
       _SLTEC_subdomain=$(printf "%s" "$_ST_split_fulldomain" | cut -d . -f 1-$_SLTEC_sd_p)
+      # get the system nameserver
+      _SLTEC_systemns=$(echo "$_SLTEC_response" | awk '/<system_ns>/ { match($0, /<system_ns>(.+)<\/system_ns>/, ns); print ns[1]; }')
       _debug "_SLTEC_subdomain" "$_SLTEC_subdomain"
       _debug "_SLTEC_domain" "$_SLTEC_domain"
+      _debug "_SLTEC_systemns" "$_SLTEC_systemns"
       return 0
     fi
 
@@ -211,7 +217,8 @@ _SLTEC_init_request_add() {
   _ST_init_add_context="$3"
   _ST_init_add_domain="$4"
   _ST_init_add_subdomain="$5"
-  _ST_init_add_value="$6"
+  _ST_init_add_systemns="$6"
+  _ST_init_add_value="$7"
 
   _SLTEC_xmladd="<?xml version='1.0' encoding='utf-8'?>
   <request>
@@ -232,6 +239,7 @@ _SLTEC_init_request_add() {
       </default>
       <zone>
         <name>${_ST_init_add_domain}</name>
+        <system_ns>${_ST_init_add_systemns}</system_ns>
       </zone>
     </task>
   </request>"
@@ -243,7 +251,8 @@ _SLTEC_init_request_rm() {
   _ST_init_rm_context="$3"
   _ST_init_rm_domain="$4"
   _ST_init_rm_subdomain="$5"
-  _ST_init_rm_value="$6"
+  _ST_init_rm_systemns="$6"
+  _ST_init_rm_value="$7"
 
   _SLTEC_xmlrm="<?xml version='1.0' encoding='utf-8'?>
   <request>
@@ -263,6 +272,7 @@ _SLTEC_init_request_rm() {
       </default>
       <zone>
         <name>${_ST_init_rm_domain}</name>
+        <system_ns>${_ST_init_rm_systemns}</system_ns>
       </zone>
     </task>
   </request>"
