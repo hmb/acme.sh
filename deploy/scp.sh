@@ -103,7 +103,7 @@ scp_deploy() {
   fi
 
   if [ ! -z "$DEPLOY_SCP_FULLCHAIN_TARGET" ]; then
-    scp "$_cfullchain" "$DEPLOY_SCP_FULLCHAIN_TARGET"
+    scp "$_cfullchain" "${DEPLOY_SCP_FULLCHAIN_TARGET}${_cdomain}.cer"
     if [ "$?" -ne 0 ]; then
       _err "scp copy to server failed"
       return 1
