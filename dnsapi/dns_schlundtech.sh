@@ -42,7 +42,7 @@ dns_schlundtech_add() {
   fi
 
   if ! _SLTEC_split_domain "$fulldomain"; then
-    _err "domain either invalid or not hosted by this account" 
+    _err "domain either invalid or not hosted by this account"
     return 1
   fi
 
@@ -79,7 +79,7 @@ dns_schlundtech_rm() {
   fi
 
   if ! _SLTEC_split_domain "$fulldomain"; then
-    _err "domain either invalid or not hosted by this account" 
+    _err "domain either invalid or not hosted by this account"
     return 1
   fi
 
@@ -282,7 +282,7 @@ _SLTEC_send_request() {
   _ST_send_request="$1"
   _ST_send_url="$2"
 
-  _H1="Content-Type: text/xml"
+  export _H1="Content-Type: text/xml"
   _SLTEC_response="$(_post "${_ST_send_request}" "${_ST_send_url}")"
   _debug "response: ${_SLTEC_response}"
 }
