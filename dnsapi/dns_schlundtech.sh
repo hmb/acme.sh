@@ -114,16 +114,18 @@ _SLTEC_credentials() {
     SLTEC_server="${SLTEC_server_default}"
   fi
 
-  if [ -z "${SLTEC_user}" ] || [ -z "$SLTEC_password" ] || [ -z "${SLTEC_context}" ] || [ -z "${SLTEC_server}" ]; then
+  if [ -z "${SLTEC_user}" ] || [ -z "$SLTEC_password" ] || [ -z "${SLTEC_context}" ] || [ -z "${SLTEC_token}" ] || [ -z "${SLTEC_server}" ]; then
     SLTEC_user=""
     SLTEC_password=""
     SLTEC_context=""
+    SLTEC_token=""
     SLTEC_server=""
     return 1
   else
     _saveaccountconf SLTEC_user "${SLTEC_user}"
     _saveaccountconf SLTEC_password "${SLTEC_password}"
     _saveaccountconf SLTEC_context "${SLTEC_context}"
+    _saveaccountconf SLTEC_token "${SLTEC_token}"
     _saveaccountconf SLTEC_server "${SLTEC_server}"
     return 0
   fi
@@ -192,6 +194,7 @@ _SLTEC_init_request_zoneinq() {
   _ST_init_zi_password="$2"
   _ST_init_zi_context="$3"
   _ST_init_zi_domain="$4"
+  _ST_init_zi_token=$(oathtool --totp -b "$SLTEC_token")
 
   _SLTEC_xmlzoneinq="<?xml version='1.0' encoding='utf-8'?>
   <request>
@@ -199,6 +202,7 @@ _SLTEC_init_request_zoneinq() {
       <user>${_ST_init_zi_user}</user>
       <password>${_ST_init_zi_password}</password>
       <context>${_ST_init_zi_context}</context>
+      <token>${_ST_init_zi_token}</token>
     </auth>
     <task>
       <code>0205</code>
@@ -219,6 +223,7 @@ _SLTEC_init_request_add() {
   _ST_init_add_subdomain="$5"
   _ST_init_add_systemns="$6"
   _ST_init_add_value="$7"
+  _ST_init_add_token=$(oathtool --totp -b "$SLTEC_token")
 
   _SLTEC_xmladd="<?xml version='1.0' encoding='utf-8'?>
   <request>
@@ -226,6 +231,7 @@ _SLTEC_init_request_add() {
       <user>${_ST_init_add_user}</user>
       <password>${_ST_init_add_password}</password>
       <context>${_ST_init_add_context}</context>
+      <token>${_ST_init_add_token}</token>
     </auth>
     <task>
       <code>0202001</code>
@@ -253,6 +259,7 @@ _SLTEC_init_request_rm() {
   _ST_init_rm_subdomain="$5"
   _ST_init_rm_systemns="$6"
   _ST_init_rm_value="$7"
+  _ST_init_rm_token=$(oathtool --totp -b "$SLTEC_token")
 
   _SLTEC_xmlrm="<?xml version='1.0' encoding='utf-8'?>
   <request>
@@ -260,6 +267,7 @@ _SLTEC_init_request_rm() {
       <user>${_ST_init_rm_user}</user>
       <password>${_ST_init_rm_password}</password>
       <context>${_ST_init_rm_context}</context>
+      <token>${_ST_init_rm_token}</token>
     </auth>
     <task>
       <code>0202001</code>
