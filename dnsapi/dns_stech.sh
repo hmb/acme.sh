@@ -5,7 +5,7 @@
 # Use as DNS api with the acme.sh LetsEncrypt script.
 # See https://github.com/Neilpang/acme.sh for more information.
 #
-# Usage: acme.sh --issue --dns dns_schlundtech -d www.domain.com
+# Usage: acme.sh --issue --dns dns_stech -d www.domain.com
 #
 # Author: Holger Böhnke
 # Report bugs here: https://github.com/hmb/acme.sh
@@ -17,6 +17,7 @@
 # set these values, when using the provider the first time
 #export SLTEC_user="0000000"
 #export SLTEC_password="********************"
+#export SLTEC_token="********************"
 
 # set these values if they differ from the default below
 #export SLTEC_context="10"
@@ -29,9 +30,9 @@ SLTEC_server_default="https://gateway.schlundtech.de/"
 ########  public functions #####################
 
 # Add the txt record before validation.
-# Usage: dns_schlundtech_add _acme-challenge.www.domain.com "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
+# Usage: dns_stech_add _acme-challenge.www.domain.com "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
 
-dns_schlundtech_add() {
+dns_stech_add() {
   fulldomain="$1"
   txtvalue="$2"
 
@@ -66,9 +67,9 @@ dns_schlundtech_add() {
 }
 
 # Remove the txt record after validation.
-# Usage: dns_schlundtech_rm _acme-challenge.www.domain.com "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
+# Usage: dns_stech_rm _acme-challenge.www.domain.com "XKrxpRBosdIKFzxW_CT3KLZNf6q0HG9i01zxXp5CPBs"
 
-dns_schlundtech_rm() {
+dns_stech_rm() {
   fulldomain="$1"
   txtvalue="$2"
 
