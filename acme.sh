@@ -9,6 +9,8 @@ PROJECT_ENTRY="acme.sh"
 PROJECT="https://github.com/acmesh-official/$PROJECT_NAME"
 
 DEFAULT_INSTALL_HOME="$HOME/.$PROJECT_NAME"
+DEFAULT_INSTALL_HOME="/var/lib/acme.sh"
+DEFAULT_INSTALL_HOME="/home/holger/project/acme.sh/xxx/usr/lib/acme.sh"
 
 _WINDOWS_SCHEDULER_NAME="$PROJECT_NAME.cron"
 
