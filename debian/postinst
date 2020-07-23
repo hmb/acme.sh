@@ -17,9 +17,19 @@ set -e
 # for details, see https://www.debian.org/doc/debian-policy/ or
 # the debian-policy package
 
+USER=acmesh
+HOME=/var/lib/acme.sh
+LOGDIR=/var/log/acme.sh
 
 case "$1" in
     configure)
+        getent passwd $USER > /dev/null
+        if [ $? -ne 0 ]; then
+            adduser --system --home $HOME --gecos "acme.sh client" \
+                    --no-create-home --disabled-password \
+                    --quiet $USER || true
+        fi
+        chown $USER:nogroup $HOME $LOGDIR
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
