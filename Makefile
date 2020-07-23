@@ -1,4 +1,3 @@
-DESTDIR=~/project/acme.sh/xxx
 NAME=acme.sh
 ETCDIR=$(DESTDIR)/etc/$(NAME)
 BINDIR=$(DESTDIR)/usr/bin
@@ -7,7 +6,11 @@ LOGDIR=$(DESTDIR)/var/log/$(NAME)
 VARLIBDIR=$(DESTDIR)/var/lib/$(NAME)
 
 all:
-	echo all
+	echo "there's no0 default target use the following targets:"
+	echo " :install:
+	echo " :test-clean:
+	echo " :testinst:
+	echo " :find:
 
 install:
 	install -d $(BINDIR)/
@@ -23,13 +26,19 @@ install:
 	ln -s $(LIBDIR)/$(NAME) $(BINDIR)
 	install --mode=644 account.conf $(ETCDIR)/
 
-ic:
+# test targets to install into the test dir xxx
+DESTDIRTEST=$(shell pwd)/xxx
+
+test-clean: DESTDIR=$(DESTDIRTEST)
+test-clean:
 	rm -rf $(DESTDIR)
 	rm -rf ~/.acme.sh/
 
-it: ic install
+testinst: export DESTDIR=$(DESTDIRTEST)
+testinst: test-clean install
 
-if: it
-	find $(DESTDIR)
+find: DESTDIR=$(DESTDIRTEST)
+find:
+	find $(DESTDIR) | sort
 
-.PHONY: all install ic if it
+.PHONY: all install test-clean testinst find
