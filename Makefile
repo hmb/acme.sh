@@ -19,12 +19,12 @@ install:
 	./acme.sh --install  \
 		--home $(LIBDIR) \
 		--config-home $(VARLIBDIR) \
-		--cert-home $(VARLIBDIR)/issued  \
-		--accountconf $(ETCDIR)/account.conf \
+		--cert-home $(VARLIBDIR)/certs \
 		--noprofile \
 		--nocron
 	ln -s $(LIBDIR)/$(NAME) $(BINDIR)
-	install --mode=644 account.conf $(ETCDIR)/
+	install --mode=644 conf/acme.sh.conf $(ETCDIR)/
+	install --mode=644 conf/account.conf $(VARLIBDIR)
 
 # test targets to install into the test dir xxx
 DESTDIRTEST=$(shell pwd)/xxx
