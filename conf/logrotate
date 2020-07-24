@@ -1,0 +1,7 @@
+/var/log/acme-sh/acme-sh.log {
+  rotate 12
+  monthly
+  compress
+  missingok
+  notifempty
+}

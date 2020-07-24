@@ -1,16 +1,20 @@
-NAME=acme.sh
+NAME=acme-sh
+BINNAME=acme.sh
 ETCDIR=$(DESTDIR)/etc/$(NAME)
 BINDIR=$(DESTDIR)/usr/bin
 LIBDIR=$(DESTDIR)/usr/lib/$(NAME)
 LOGDIR=$(DESTDIR)/var/log/$(NAME)
 VARLIBDIR=$(DESTDIR)/var/lib/$(NAME)
+LOGROTDIR=$(DESTDIR)/etc/logrotate.d
+# the installed symlink is relative to the bin
+FINALBIN=../lib/$(NAME)/$(BINNAME)
 
 all:
-	echo "there's no0 default target use the following targets:"
-	echo " :install:
-	echo " :test-clean:
-	echo " :testinst:
-	echo " :find:
+	echo "there's no default target use the following targets:"
+	echo " :install:"
+	echo " :clean:"
+	echo " :test:"
+	echo " :find:"
 
 install:
 	install -d $(BINDIR)/
@@ -22,23 +26,32 @@ install:
 		--cert-home $(VARLIBDIR)/certs \
 		--noprofile \
 		--nocron
-	ln -s $(LIBDIR)/$(NAME) $(BINDIR)
-	install --mode=644 conf/acme.sh.conf $(ETCDIR)/
-	install --mode=644 conf/account.conf $(VARLIBDIR)
+	ln -s $(FINALBIN) $(BINDIR)
+	install --mode=644 conf/acme-sh.conf $(ETCDIR)/
+	install --mode=644 conf/account.conf $(VARLIBDIR)/
+	install -d $(VARLIBDIR)/.ssh
+	install conf/ssh.conf $(VARLIBDIR)/.ssh/config
+	install -d $(LOGROTDIR)
+	install --mode=644 conf/logrotate $(LOGROTDIR)/acme-sh
+
+debian:
+	debuild -uc -us
 
 # test targets to install into the test dir xxx
 DESTDIRTEST=$(shell pwd)/xxx
 
-test-clean: DESTDIR=$(DESTDIRTEST)
-test-clean:
+clean: DESTDIR=$(DESTDIRTEST)
+clean:
 	rm -rf $(DESTDIR)
-	rm -rf ~/.acme.sh/
 
-testinst: export DESTDIR=$(DESTDIRTEST)
-testinst: test-clean install
+test: export DESTDIR=$(DESTDIRTEST)
+test: clean install
+	rm -r $(DESTDIR)/usr/lib/$(NAME)/deploy
+	rm -r $(DESTDIR)/usr/lib/$(NAME)/dnsapi
+	rm -r $(DESTDIR)/usr/lib/$(NAME)/notify
 
 find: DESTDIR=$(DESTDIRTEST)
-find:
+find: test
 	find $(DESTDIR) | sort
 
-.PHONY: all install test-clean testinst find
+.PHONY: all install debian clean test find
