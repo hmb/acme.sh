@@ -18,18 +18,22 @@ set -e
 # the debian-policy package
 
 USER=acmesh
-HOME=/var/lib/acme.sh
-LOGDIR=/var/log/acme.sh
+HOME=/var/lib/acme-sh
+SSHKEY=$HOME/.ssh/acmesh
+LOGDIR=/var/log/acme-sh
 
 case "$1" in
     configure)
-        getent passwd $USER > /dev/null
-        if [ $? -ne 0 ]; then
-            adduser --system --home $HOME --gecos "acme.sh client" \
+        if ! getent passwd $USER > /dev/null; then
+            adduser --system --home $HOME --gecos "LetsEncrypt client acme.sh" \
                     --no-create-home --disabled-password \
                     --quiet $USER || true
         fi
-        chown $USER:nogroup $HOME $LOGDIR
+        if [ ! -f $SSHKEY ]; then
+            ssh-keygen -t rsa -b 4096 -q -N "" -f $SSHKEY -C "ssh key to distribute LetsEncrypt certs created with acme.sh"
+        fi
+        chown -R $USER:nogroup $HOME $LOGDIR
+        chmod 700 $HOME/.ssh
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)
