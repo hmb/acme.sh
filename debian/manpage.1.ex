@@ -1,5 +1,5 @@
 .\"                                      Hey, EMACS: -*- nroff -*-
-.\" (C) Copyright 2020 Holger Böhnke <acme.sh@biz.amarin.de>,
+.\" (C) Copyright 2020 Holger Böhnke <acme-sh@biz.amarin.de>,
 .\"
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
