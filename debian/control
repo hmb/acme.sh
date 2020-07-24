@@ -1,0 +1,19 @@
+Source: acme-sh
+Section: misc
+Priority: optional
+Maintainer: Holger Böhnke <acme-sh@biz.amarin.de>
+Build-Depends: debhelper (>= 11)
+Standards-Version: 4.1.3
+Homepage: https://github.com/acmesh-official
+Vcs-Browser: https://github.com/acmesh-official/acme.sh
+Vcs-Git: https://github.com/acmesh-official/acme.sh.git
+
+Package: acme-sh
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, adduser, curl
+Recommends: logrotate
+Description: Acme.sh is a single file LetsEncrypt shell script client.
+ Acme.sh is a single file LetsEncrypt shell script client. Usually it is
+ installed and run in a users home directory. This debian package installs
+ acme.sh as system binary. The configuration is adopted to the debian way.
+ It is not intended to use manually but to run by a cron job.
