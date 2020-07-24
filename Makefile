@@ -10,11 +10,11 @@ LOGROTDIR=$(DESTDIR)/etc/logrotate.d
 FINALBIN=../lib/$(NAME)/$(BINNAME)
 
 all:
-	echo "there's no default target use the following targets:"
-	echo " :install:"
-	echo " :clean:"
-	echo " :test:"
-	echo " :find:"
+	@echo "there's no default target use the following targets:"
+	@echo "install: install the package in \$DESTDIR"
+	@echo "test   : install the package in the dir xxx"
+	@echo "find   : run a find over the test installation"
+	@echo "clean  : remove the test installation"
 
 install:
 	install -d $(BINDIR)/
