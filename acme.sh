@@ -5989,6 +5989,8 @@ install() {
         _bash_path="$(bash -c 'echo $SHELL')"
       fi
     fi
+    # buster tells /usr/bin/bash but use /bin/bash for backwords compatibility
+    _bash_path="/bin/bash"
     if [ "$_bash_path" ]; then
       _info "Good, bash is found, so change the shebang to use bash as preferred."
       _shebang='#!'"$_bash_path"
